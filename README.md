@@ -5,11 +5,11 @@ This project uses a gemini-copied spatial hash table and bitmapped tiles, design
 
 
 ## Personal Note
-Its been a little over 3 weeks at the time of writing this message that I've started this project.
-I'm using SDL for the first time and rely entirely on AI for UI related stuff, but most of the other code are _definetly_ all my idea and the SDL part will be replaced by _my original_ ideas soon.
-I expect to have a working prototype by December 2026. I haven't thought of a name for it yet, I'll be grateful for any non-AI contributions :)
+It's been a little over 3 weeks at the time of writing this message that I've started this project.
+I'm using SDL for the first time and rely entirely on AI for UI related stuff, but most of the code is _definitely_ all my idea and the SDL part will be replaced by _my original_ ideas soon.
+I expect to have a working prototype by December 2026. I haven't thought of a name for it yet. I'll be grateful for any non-AI contributions :)
 
-_I'll write down the entire README once I'm done with the actual project. Gemini thinks really high of my project lmao_
+_I'll write down the entire README once I'm done with the actual project. Gemini thinks really highly of my project lmao_
 
 
 ## 🚀 Performance Features
