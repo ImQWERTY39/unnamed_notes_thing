@@ -2,6 +2,8 @@
 #define TILE_C
 
 #include "../include/geometry.h"
+#include <stdio.h>
+#include <string.h>
 
 #define TILE_SIZE 256
 #define MSB_SHIFT(x) (0x8000000000000000 >> (x))
@@ -15,7 +17,11 @@ typedef struct {
 
 inline int32_t floor_div(int32_t a);
 Point tile_coords(Point global_coords);
+
 void set(Tile* tile, uint8_t x, uint8_t y);
 void clear(Tile* tile, uint8_t x, uint8_t y);
+
+void serialize_tile(FILE* file, Tile* tile);
+void deserialize_tile(FILE* file, Tile* tile);
 
 #endif
