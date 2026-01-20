@@ -2,3 +2,4 @@ Makefile
 
 main
 *.o
+*.bin

@@ -228,6 +228,7 @@ int main() {
 
     EventState event_state = {0};
     Document document = {0};
+    document.last_key = 0xFFFFFFFFFFFFFFFF;
     load_file(&document);
 
     uint32_t* framebuffer = calloc(SCREEN_WIDTH * SCREEN_HEIGHT, sizeof(uint32_t));
