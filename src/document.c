@@ -3,10 +3,6 @@
 
 #include "../include/document.h"
 
-static uint64_t point_as_key(Point p) {
-    return ((uint64_t)(uint32_t)p.x << 32) | (uint32_t)p.y;
-}
-
 static uint64_t hash_point(uint64_t x) {
     x = (x ^ (x >> 30)) * 0xbf58476d1ce4e5b9;
     x = (x ^ (x >> 27)) * 0x94d049bb133111eb;

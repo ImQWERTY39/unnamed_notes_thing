@@ -52,8 +52,14 @@ Point from_filename(const char* name) {
 }
 
 void serialize_tile(Tile* tile) {
-    char file_name[9] = {0};
+    char file_name[13];
     to_filename(file_name, tile->key);
+    file_name[8] = '.';
+    file_name[9] = 'b';
+    file_name[10] = 'i';
+    file_name[11] = 'n';
+    file_name[12] = '\0';
+
     FILE* file = fopen(file_name, "wb");
 
     uint64_t written_rows[4] = {0};
@@ -73,11 +79,7 @@ void serialize_tile(Tile* tile) {
     }
 }
 
-void deserialize_tile(Tile* tile) {
-    char file_name[9] = {0};
-    to_filename(file_name, tile->key);
-    FILE* file = fopen(file_name, "wb");
-
+void deserialize_tile(FILE* file, Tile* tile) {
     uint64_t written_rows[4] = {0};
 
     uint32_t bytes_read = fread(written_rows, sizeof(uint64_t), 4, file);
@@ -97,4 +99,36 @@ void deserialize_tile(Tile* tile) {
     }
 }
 
-void load_file(Document* document) {}
+void load_file(Document* document) {
+    for (size_t x = 0; x < 7; x++) {
+        for (size_t y = 0; y < 4; y++) {
+            Point t_coord = (Point){x, y};
+            uint64_t key = point_as_key(t_coord);
+
+            char name[13] = {0};
+            to_filename(name, key);
+            name[8] = '.';
+            name[9] = 'b';
+            name[10] = 'i';
+            name[11] = 'n';
+            name[12] = '\0';
+
+            FILE* f = fopen(name, "rb");
+
+            if (f == NULL) {
+                continue;
+            }
+
+            Tile* t = get_tile(document, t_coord, CREATE_MISSING);
+            deserialize_tile(f, t);
+        }
+    }
+}
+
+void flush_document(Document* doc) {
+    for (size_t i = 0; i < HASHTABLE_CAPACITY; i++) {
+        if (doc->occupied[i / 64] & MSB_SHIFT(i % 64)) {
+            serialize_tile(&doc->tiles[i]);
+        }
+    }
+}

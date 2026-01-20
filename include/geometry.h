@@ -9,5 +9,6 @@ typedef struct {
 } Point;
 
 uint32_t distance_sq(Point a, Point b);
+uint64_t point_as_key(Point p);
 
 #endif

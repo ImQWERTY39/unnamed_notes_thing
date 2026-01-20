@@ -228,6 +228,7 @@ int main() {
 
     EventState event_state = {0};
     Document document = {0};
+    load_file(&document);
 
     uint32_t* framebuffer = calloc(SCREEN_WIDTH * SCREEN_HEIGHT, sizeof(uint32_t));
     SDL_Texture* texture = SDL_CreateTexture(
@@ -259,7 +260,7 @@ int main() {
         render(renderer, &event_state, &document, framebuffer, texture);
     }
 
-    // flush_document(&document);
+    flush_document(&document);
 
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);
