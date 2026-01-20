@@ -15,13 +15,18 @@ typedef struct {
     BitMap map;
 } Tile;
 
-inline int32_t floor_div(int32_t a);
+inline int32_t floor_div(int32_t a) {
+    int32_t q = a / TILE_SIZE;
+
+    if (a < 0 && a % TILE_SIZE != 0)
+        q--;
+
+    return q;
+}
+
 Point tile_coords(Point global_coords);
 
 void set(Tile* tile, uint8_t x, uint8_t y);
 void clear(Tile* tile, uint8_t x, uint8_t y);
-
-void serialize_tile(FILE* file, Tile* tile);
-void deserialize_tile(FILE* file, Tile* tile);
 
 #endif

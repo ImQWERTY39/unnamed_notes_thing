@@ -1,8 +1,9 @@
 #include <SDL2/SDL.h>
 #include <stdint.h>
 
-#include "document.c"
-#include "tiles.c"
+#include "../include/document.h"
+#include "../include/fileio.h"
+#include "../include/tiles.h"
 
 const int32_t SCREEN_WIDTH = 1600;
 const int32_t SCREEN_HEIGHT = 1000;
@@ -42,7 +43,6 @@ void poll_event(EventState* event_state) {
         case SDL_MOUSEBUTTONDOWN:
             if (event.button.button == SDL_BUTTON_LEFT) {
                 event_state->left_mouse_down = 1;
-
                 event_state->last_sample_time = SDL_GetTicks();
                 event_state->last_sample_pos.x = event.button.x;
                 event_state->last_sample_pos.y = event.button.y;
@@ -258,6 +258,8 @@ int main() {
 
         render(renderer, &event_state, &document, framebuffer, texture);
     }
+
+    // flush_document(&document);
 
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);
