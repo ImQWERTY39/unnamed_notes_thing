@@ -14,4 +14,11 @@ void deserialize_tile(FILE* file, Tile* tile);
 void load_file(Document* doc);
 void flush_document(Document* doc);
 
+/*
+have load_file (or new func) take coordinates of the top left corner
+to load tiles around that coord...
+
+count for possibility of overflow (how?), flush before loading if overflow
+*/
+
 #endif

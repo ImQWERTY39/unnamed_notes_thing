@@ -14,11 +14,13 @@ typedef enum {
     PEN = 0,
     ERASER,
     PAN,
+    LINE,
 } Mode;
 
 typedef struct {
     uint8_t quit;
     uint8_t left_mouse_down;
+    uint8_t just_left_mouse;
     Mode mode;
 
     Uint32 last_sample_time;
@@ -29,6 +31,7 @@ typedef struct {
 
 void poll_event(EventState* event_state) {
     SDL_Event event;
+    event_state->just_left_mouse = 0;
 
     while (SDL_PollEvent(&event)) {
         switch (event.type) {
@@ -38,11 +41,13 @@ void poll_event(EventState* event_state) {
 
         case SDL_MOUSEBUTTONUP:
             event_state->left_mouse_down = 0;
+            event_state->just_left_mouse = 1;
             break;
 
         case SDL_MOUSEBUTTONDOWN:
             if (event.button.button == SDL_BUTTON_LEFT) {
                 event_state->left_mouse_down = 1;
+                event_state->just_left_mouse = 0;
                 event_state->last_sample_time = SDL_GetTicks();
                 event_state->last_sample_pos.x = event.button.x;
                 event_state->last_sample_pos.y = event.button.y;
@@ -61,6 +66,10 @@ void poll_event(EventState* event_state) {
 
             case SDLK_a:
                 event_state->mode = PAN;
+                break;
+
+            case SDLK_h:
+                event_state->mode = LINE;
                 break;
             }
 
@@ -113,6 +122,21 @@ void pen(EventState* event_state, Document* document) {
 
     draw_line_global(document, prev_global_coords, global_coords);
     event_state->last_sample_pos = mouse_coords;
+}
+
+void line(EventState* event_state, Document* doc) {
+    Point mouse_coords;
+    SDL_GetMouseState(&mouse_coords.x, &mouse_coords.y);
+
+    Point prev_global_coords = event_state->last_sample_pos;
+    Point global_coords = mouse_coords;
+
+    prev_global_coords.x += event_state->top_left_corner.x;
+    prev_global_coords.y += event_state->top_left_corner.y;
+    global_coords.x += event_state->top_left_corner.x;
+    global_coords.y += event_state->top_left_corner.y;
+
+    draw_line_global(doc, prev_global_coords, global_coords);
 }
 
 void erase(EventState* es, Document* doc) {
@@ -255,7 +279,14 @@ int main() {
             case ERASER:
                 erase(&event_state, &document);
                 break;
+
+            default:
+                break;
             }
+        }
+
+        if (event_state.mode == LINE && event_state.just_left_mouse) {
+            line(&event_state, &document);
         }
 
         render(renderer, &event_state, &document, framebuffer, texture);

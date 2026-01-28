@@ -22,9 +22,6 @@ Tile* get_tile(Document* doc, Point tile_coord, uint8_t flags) {
     do {
         if (!(doc->occupied[cur_index / 64] & MSB_SHIFT(cur_index % 64))) {
             if (flags & CREATE_MISSING) {
-                // if (doc->length >= HASHTABLE_MAX_LIMIT)
-                // flush_table(doc);
-
                 doc->tiles[cur_index].key = key;
                 doc->length += 1;
                 doc->occupied[cur_index / 64] |= MSB_SHIFT(cur_index % 64);
