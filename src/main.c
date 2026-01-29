@@ -122,6 +122,11 @@ void pen(EventState* event_state, Document* document) {
 
     draw_line_global(document, prev_global_coords, global_coords);
     event_state->last_sample_pos = mouse_coords;
+
+    if (document->length >= 150) {
+        flush_document(document);
+        load_file(document, event_state->top_left_corner);
+    }
 }
 
 void line(EventState* event_state, Document* doc) {
@@ -197,12 +202,25 @@ void render(
     if (offset_y < 0)
         offset_y += TILE_SIZE;
 
+    // use the metadata checking thing to see if the file exists
+    // if any found, load locality
     for (int ty = tile_start_y; ty <= tile_end_y; ty++) {
         for (int tx = tile_start_x; tx <= tile_end_x; tx++) {
             Point tile_coords = {tx, ty};
             Tile* t = get_tile(document, tile_coords, IGNORE);
+
             if (t == NULL) {
-                continue;
+                char name[13] = {0};
+                to_filename(name, point_as_key(tile_coords));
+
+                FILE* f = fopen(name, "rb");
+                if (f == NULL) {
+                    continue;
+                }
+
+                fclose(f);
+                load_file(document, es->top_left_corner);
+                t = get_tile(document, tile_coords, IGNORE);
             }
 
             for (int r = 0; r < TILE_SIZE; r++) {
@@ -253,7 +271,7 @@ int main() {
     EventState event_state = {0};
     Document document = {0};
     document.last_key = 0xFFFFFFFFFFFFFFFF;
-    load_file(&document);
+    load_file(&document, event_state.top_left_corner);
 
     uint32_t* framebuffer = calloc(SCREEN_WIDTH * SCREEN_HEIGHT, sizeof(uint32_t));
     SDL_Texture* texture = SDL_CreateTexture(

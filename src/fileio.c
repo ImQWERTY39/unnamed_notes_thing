@@ -28,7 +28,11 @@ void to_filename(char* name, uint64_t key) {
     name[6] = BASE64_ENCODING[(key >> 44) & 63];
     name[7] = BASE64_ENCODING[(key >> 50) & 63];
 
-    name[8] = '\0';
+    name[8] = '.';
+    name[9] = 'b';
+    name[10] = 'i';
+    name[11] = 'n';
+    name[12] = '\0';
 }
 
 Point from_filename(const char* name) {
@@ -45,21 +49,12 @@ Point from_filename(const char* name) {
         y |= 0xFF000000;
     }
 
-    return (Point){
-        x,
-        y,
-    };
+    return (Point){x, y};
 }
 
 void serialize_tile(Tile* tile) {
-    char file_name[13];
+    char file_name[13] = {0};
     to_filename(file_name, tile->key);
-    file_name[8] = '.';
-    file_name[9] = 'b';
-    file_name[10] = 'i';
-    file_name[11] = 'n';
-    file_name[12] = '\0';
-
     FILE* file = fopen(file_name, "wb");
 
     uint64_t written_rows[4] = {0};
@@ -99,28 +94,28 @@ void deserialize_tile(FILE* file, Tile* tile) {
     }
 }
 
-void load_file(Document* document) {
-    for (size_t x = 0; x < 7; x++) {
-        for (size_t y = 0; y < 4; y++) {
-            Point t_coord = (Point){x, y};
+void load_file(Document* document, Point locality) {
+    locality = tile_coords(locality);
+    if (document->length >= 100) {
+        flush_document(document);
+    }
+
+    for (int32_t x = -6; x < 14; x++) {
+        for (int32_t y = -3; y < 8; y++) {
+            Point t_coord = (Point){locality.x + x, locality.y + y};
             uint64_t key = point_as_key(t_coord);
 
             char name[13] = {0};
             to_filename(name, key);
-            name[8] = '.';
-            name[9] = 'b';
-            name[10] = 'i';
-            name[11] = 'n';
-            name[12] = '\0';
 
             FILE* f = fopen(name, "rb");
-
             if (f == NULL) {
                 continue;
             }
 
             Tile* t = get_tile(document, t_coord, CREATE_MISSING);
             deserialize_tile(f, t);
+            fclose(f);
         }
     }
 }
