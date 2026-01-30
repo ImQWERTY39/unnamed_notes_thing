@@ -22,11 +22,12 @@ Tile* get_tile(Document* doc, Point tile_coord, uint8_t flags) {
     do {
         if (!(doc->occupied[cur_index / 64] & MSB_SHIFT(cur_index % 64))) {
             if (flags & CREATE_MISSING) {
-                doc->tiles[cur_index].key = key;
                 doc->length += 1;
                 doc->occupied[cur_index / 64] |= MSB_SHIFT(cur_index % 64);
 
-                memset(doc->tiles[cur_index].map, 0, sizeof(BitMap));
+                Tile* tile = &doc->tiles[cur_index];
+                memset(tile, 0, sizeof(Tile));
+                tile->key = key;
 
                 doc->last_key = key;
                 doc->last_tile = &doc->tiles[cur_index];

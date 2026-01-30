@@ -72,6 +72,8 @@ void serialize_tile(Tile* tile) {
             fwrite(tile->map[r], sizeof(uint64_t), 4, file);
         }
     }
+
+    fclose(file);
 }
 
 void deserialize_tile(FILE* file, Tile* tile) {
@@ -96,11 +98,11 @@ void deserialize_tile(FILE* file, Tile* tile) {
 
 void load_file(Document* document, Point locality) {
     locality = tile_coords(locality);
-    if (document->length >= 100) {
+    if (document->length >= HASHTABLE_MAX_LIMIT) {
         flush_document(document);
     }
 
-    for (int32_t x = -6; x < 14; x++) {
+    for (int32_t x = -3; x < 11; x++) {
         for (int32_t y = -3; y < 8; y++) {
             Point t_coord = (Point){locality.x + x, locality.y + y};
             uint64_t key = point_as_key(t_coord);
@@ -126,4 +128,10 @@ void flush_document(Document* doc) {
             serialize_tile(&doc->tiles[i]);
         }
     }
+
+    doc->length = 0;
+    memset(doc->occupied, 0, sizeof(doc->occupied));
+    memset(doc->tiles, 0, sizeof(doc->tiles));
+    doc->last_key = 0xFFFFFFFFFFFFFFFF;
+    doc->last_tile = NULL;
 }

@@ -123,7 +123,7 @@ void pen(EventState* event_state, Document* document) {
     draw_line_global(document, prev_global_coords, global_coords);
     event_state->last_sample_pos = mouse_coords;
 
-    if (document->length >= 150) {
+    if (document->length >= HASHTABLE_CAPACITY) {
         flush_document(document);
         load_file(document, event_state->top_left_corner);
     }
@@ -166,7 +166,7 @@ void erase(EventState* es, Document* doc) {
     }
 }
 
-void pan(EventState* event_state) {
+void pan(Document* document, EventState* event_state) {
     Point screen_coords;
     SDL_GetMouseState(&screen_coords.x, &screen_coords.y);
 
@@ -177,6 +177,7 @@ void pan(EventState* event_state) {
     event_state->top_left_corner.y -= delta_y;
 
     event_state->last_sample_pos = screen_coords;
+    load_file(document, event_state->top_left_corner);
 }
 
 void render(
@@ -210,17 +211,7 @@ void render(
             Tile* t = get_tile(document, tile_coords, IGNORE);
 
             if (t == NULL) {
-                char name[13] = {0};
-                to_filename(name, point_as_key(tile_coords));
-
-                FILE* f = fopen(name, "rb");
-                if (f == NULL) {
-                    continue;
-                }
-
-                fclose(f);
-                load_file(document, es->top_left_corner);
-                t = get_tile(document, tile_coords, IGNORE);
+                continue;
             }
 
             for (int r = 0; r < TILE_SIZE; r++) {
@@ -291,7 +282,7 @@ int main() {
                 break;
 
             case PAN:
-                pan(&event_state);
+                pan(&document, &event_state);
                 break;
 
             case ERASER:
