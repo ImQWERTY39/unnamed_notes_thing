@@ -5,8 +5,22 @@
 #include "../include/fileio.h"
 #include "../include/tiles.h"
 
+#define QUIT 0b00000001
+#define MOUSE_BUTTON_DOWN 0b00000010
+#define JUST_LEFT_MOUSE 0b00000100
+#define TO_PEN_MODE 0b00001000
+#define TO_ERASER_MODE 0b00010000
+#define TO_PAN_MODE 0b00100000
+#define TO_LINE_MODE 0b01000000
+
 const int32_t SCREEN_WIDTH = 1600;
 const int32_t SCREEN_HEIGHT = 1000;
+
+const int32_t SIDEBAR_WIDTH = 100;
+const int32_t FOOTER_HEIGHT = 100;
+
+const int32_t CANVAS_WIDTH = SCREEN_WIDTH - SIDEBAR_WIDTH;
+const int32_t CANVAS_HEIGHT = SCREEN_HEIGHT - FOOTER_HEIGHT;
 
 const int32_t STYLUS_WIDTH = 40;
 
@@ -18,9 +32,7 @@ typedef enum {
 } Mode;
 
 typedef struct {
-    uint8_t quit;
-    uint8_t left_mouse_down;
-    uint8_t just_left_mouse;
+    uint8_t qualifiers;
     Mode mode;
 
     Uint32 last_sample_time;
@@ -31,48 +43,45 @@ typedef struct {
 
 void poll_event(EventState* event_state) {
     SDL_Event event;
-    event_state->just_left_mouse = 0;
+    event_state->qualifiers &= ~JUST_LEFT_MOUSE;
 
     while (SDL_PollEvent(&event)) {
         switch (event.type) {
         case SDL_QUIT:
-            event_state->quit = 1;
+            event_state->qualifiers |= QUIT;
             break;
 
         case SDL_MOUSEBUTTONUP:
-            event_state->left_mouse_down = 0;
-            event_state->just_left_mouse = 1;
+            event_state->qualifiers &= ~MOUSE_BUTTON_DOWN;
+            event_state->qualifiers |= JUST_LEFT_MOUSE;
             break;
 
         case SDL_MOUSEBUTTONDOWN:
-            if (event.button.button == SDL_BUTTON_LEFT) {
-                event_state->left_mouse_down = 1;
-                event_state->just_left_mouse = 0;
+            if (event.button.x >= CANVAS_WIDTH) {
+                switch (event.button.y) {
+                case 0 ... SCREEN_HEIGHT / 4:
+                    event_state->mode = PEN;
+                    break;
+                case SCREEN_HEIGHT / 4 + 1 ... SCREEN_HEIGHT / 2:
+                    event_state->mode = ERASER;
+                    break;
+                case SCREEN_HEIGHT / 2 + 1 ... 3 * SCREEN_HEIGHT / 4:
+                    event_state->mode = PAN;
+                    break;
+                default:
+                    event_state->mode = LINE;
+                    break;
+                }
+
+                event_state->last_sample_pos.x = event.button.x;
+                event_state->last_sample_pos.y = event.button.y;
+            } else if (event.button.button == SDL_BUTTON_LEFT) {
+                event_state->qualifiers |= MOUSE_BUTTON_DOWN;
+                event_state->qualifiers &= ~JUST_LEFT_MOUSE;
                 event_state->last_sample_time = SDL_GetTicks();
                 event_state->last_sample_pos.x = event.button.x;
                 event_state->last_sample_pos.y = event.button.y;
             }
-            break;
-
-        case SDL_KEYDOWN:
-            switch (event.key.keysym.sym) {
-            case SDLK_e:
-                event_state->mode = ERASER;
-                break;
-
-            case SDLK_p:
-                event_state->mode = PEN;
-                break;
-
-            case SDLK_a:
-                event_state->mode = PAN;
-                break;
-
-            case SDLK_h:
-                event_state->mode = LINE;
-                break;
-            }
-
             break;
         }
     }
@@ -130,11 +139,12 @@ void pen(EventState* event_state, Document* document) {
 }
 
 void line(EventState* event_state, Document* doc) {
-    Point mouse_coords;
-    SDL_GetMouseState(&mouse_coords.x, &mouse_coords.y);
-
     Point prev_global_coords = event_state->last_sample_pos;
-    Point global_coords = mouse_coords;
+    Point global_coords;
+    SDL_GetMouseState(&global_coords.x, &global_coords.y);
+
+    if (prev_global_coords.x == global_coords.x && prev_global_coords.y == global_coords.y)
+        return;
 
     prev_global_coords.x += event_state->top_left_corner.x;
     prev_global_coords.y += event_state->top_left_corner.y;
@@ -190,10 +200,10 @@ void render(
     memset(framebuffer, 0xFFFFFFFF, SCREEN_WIDTH * SCREEN_HEIGHT * sizeof(uint32_t));
 
     int32_t tile_start_x = floor_div(es->top_left_corner.x);
-    int32_t tile_end_x = floor_div(es->top_left_corner.x + SCREEN_WIDTH);
+    int32_t tile_end_x = floor_div(es->top_left_corner.x + CANVAS_WIDTH);
 
     int32_t tile_start_y = floor_div(es->top_left_corner.y);
-    int32_t tile_end_y = floor_div(es->top_left_corner.y + SCREEN_HEIGHT);
+    int32_t tile_end_y = floor_div(es->top_left_corner.y + CANVAS_HEIGHT);
 
     int32_t offset_x = es->top_left_corner.x % TILE_SIZE;
     if (offset_x < 0)
@@ -216,13 +226,13 @@ void render(
 
             for (int r = 0; r < TILE_SIZE; r++) {
                 int sy = (ty - tile_start_y) * TILE_SIZE + r - offset_y;
-                if (sy < 0 || sy >= SCREEN_HEIGHT)
+                if (sy < 0 || sy >= CANVAS_HEIGHT)
                     continue;
 
                 for (int c = 0; c < TILE_SIZE; c++) {
                     if (t->map[r][c / 64] & MSB_SHIFT(c % 64)) {
                         int sx = (tx - tile_start_x) * TILE_SIZE + c - offset_x;
-                        if (sx < 0 || sx >= SCREEN_WIDTH)
+                        if (sx < 0 || sx >= CANVAS_WIDTH)
                             continue;
 
                         framebuffer[sy * SCREEN_WIDTH + sx] = 0xFF000000;
@@ -271,11 +281,11 @@ int main() {
 
     while (1) {
         poll_event(&event_state);
-        if (event_state.quit) {
+        if (event_state.qualifiers & QUIT) {
             break;
         }
 
-        if (event_state.left_mouse_down) {
+        if (event_state.qualifiers & MOUSE_BUTTON_DOWN) {
             switch (event_state.mode) {
             case PEN:
                 pen(&event_state, &document);
@@ -294,7 +304,7 @@ int main() {
             }
         }
 
-        if (event_state.mode == LINE && event_state.just_left_mouse) {
+        if (event_state.mode == LINE && event_state.qualifiers & JUST_LEFT_MOUSE) {
             line(&event_state, &document);
         }
 
