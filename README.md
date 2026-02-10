@@ -19,14 +19,6 @@ _I'll write down the entire README once I'm done with the actual project. Gemini
 * **Row-Major Rendering:** Optimized loop structures ensure CPU cache-friendly access to the SDL framebuffer by walking memory linearly.
 * **Sparse File Storage:** Tiles are flushed to disk as separate binary files using row-masking, saving only the rows that contain actual data.
 
-
-## ⌨️ Controls
-
-* **P**: Pen Mode (Draw)
-* **E**: Eraser Mode
-* **A**: Pan Mode (Click and drag to move canvas)
-
-
 ## 💾 Storage Architecture (not even implemented yet LMAO)
 
 The application treats each document as a directory. Each tile is serialized only when "dirty" into a compact binary format:

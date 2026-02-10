@@ -16,8 +16,8 @@
 const int32_t SCREEN_WIDTH = 1600;
 const int32_t SCREEN_HEIGHT = 1000;
 
-const int32_t SIDEBAR_WIDTH = 100;
-const int32_t FOOTER_HEIGHT = 100;
+const int32_t SIDEBAR_WIDTH = 80;
+const int32_t FOOTER_HEIGHT = 64;
 
 const int32_t CANVAS_WIDTH = SCREEN_WIDTH - SIDEBAR_WIDTH;
 const int32_t CANVAS_HEIGHT = SCREEN_HEIGHT - FOOTER_HEIGHT;
@@ -52,11 +52,6 @@ void poll_event(EventState* event_state) {
             break;
 
         case SDL_MOUSEBUTTONUP:
-            event_state->qualifiers &= ~MOUSE_BUTTON_DOWN;
-            event_state->qualifiers |= JUST_LEFT_MOUSE;
-            break;
-
-        case SDL_MOUSEBUTTONDOWN:
             if (event.button.x >= CANVAS_WIDTH) {
                 switch (event.button.y) {
                 case 0 ... SCREEN_HEIGHT / 4:
@@ -75,19 +70,24 @@ void poll_event(EventState* event_state) {
 
                 event_state->last_sample_pos.x = event.button.x;
                 event_state->last_sample_pos.y = event.button.y;
-            } else if (event.button.button == SDL_BUTTON_LEFT) {
-                event_state->qualifiers |= MOUSE_BUTTON_DOWN;
-                event_state->qualifiers &= ~JUST_LEFT_MOUSE;
-                event_state->last_sample_time = SDL_GetTicks();
-                event_state->last_sample_pos.x = event.button.x;
-                event_state->last_sample_pos.y = event.button.y;
             }
+            event_state->qualifiers &= ~MOUSE_BUTTON_DOWN;
+            event_state->qualifiers |= JUST_LEFT_MOUSE;
+            break;
+
+        case SDL_MOUSEBUTTONDOWN:
+            event_state->qualifiers |= MOUSE_BUTTON_DOWN;
+            event_state->qualifiers &= ~JUST_LEFT_MOUSE;
+
+            event_state->last_sample_time = SDL_GetTicks();
+            event_state->last_sample_pos.x = event.button.x;
+            event_state->last_sample_pos.y = event.button.y;
             break;
         }
     }
 }
 
-void draw_line_global(Document* doc, Point start, Point end) {
+void draw_line_global(Document* document, Point start, Point end) {
     int dx = abs(end.x - start.x);
     int dy = abs(end.y - start.y);
     int sx = (start.x < end.x) ? 1 : -1;
@@ -96,7 +96,7 @@ void draw_line_global(Document* doc, Point start, Point end) {
 
     while (1) {
         Point tile = tile_coords(start);
-        Tile* t = get_tile(doc, tile, CREATE_MISSING);
+        Tile* t = get_tile(document, tile, CREATE_MISSING);
 
         uint8_t lx = (uint8_t)(start.x & 0xFF);
         uint8_t ly = (uint8_t)(start.y & 0xFF);
@@ -118,27 +118,26 @@ void draw_line_global(Document* doc, Point start, Point end) {
 }
 
 void pen(EventState* event_state, Document* document) {
-    Point mouse_coords;
-    SDL_GetMouseState(&mouse_coords.x, &mouse_coords.y);
-
     Point prev_global_coords = event_state->last_sample_pos;
-    Point global_coords = mouse_coords;
+    Point global_coords;
+    SDL_GetMouseState(&global_coords.x, &global_coords.y);
 
     prev_global_coords.x += event_state->top_left_corner.x;
     prev_global_coords.y += event_state->top_left_corner.y;
+
+    event_state->last_sample_pos = global_coords;
+
     global_coords.x += event_state->top_left_corner.x;
     global_coords.y += event_state->top_left_corner.y;
 
     draw_line_global(document, prev_global_coords, global_coords);
-    event_state->last_sample_pos = mouse_coords;
-
     if (document->length >= HASHTABLE_CAPACITY) {
         flush_document(document);
         load_file(document, event_state->top_left_corner);
     }
 }
 
-void line(EventState* event_state, Document* doc) {
+void line(EventState* event_state, Document* document) {
     Point prev_global_coords = event_state->last_sample_pos;
     Point global_coords;
     SDL_GetMouseState(&global_coords.x, &global_coords.y);
@@ -148,17 +147,24 @@ void line(EventState* event_state, Document* doc) {
 
     prev_global_coords.x += event_state->top_left_corner.x;
     prev_global_coords.y += event_state->top_left_corner.y;
+
+    event_state->last_sample_pos = global_coords;
+
     global_coords.x += event_state->top_left_corner.x;
     global_coords.y += event_state->top_left_corner.y;
 
-    draw_line_global(doc, prev_global_coords, global_coords);
+    draw_line_global(document, prev_global_coords, global_coords);
+    if (document->length >= HASHTABLE_CAPACITY) {
+        flush_document(document);
+        load_file(document, event_state->top_left_corner);
+    }
 }
 
-void erase(EventState* es, Document* doc) {
+void erase(EventState* event_state, Document* document) {
     Point global_coords;
     SDL_GetMouseState(&global_coords.x, &global_coords.y);
-    global_coords.x += es->top_left_corner.x;
-    global_coords.y += es->top_left_corner.y;
+    global_coords.x += event_state->top_left_corner.x;
+    global_coords.y += event_state->top_left_corner.y;
 
     Point cur;
     for (int dy = -STYLUS_WIDTH; dy <= STYLUS_WIDTH; dy++) {
@@ -166,7 +172,7 @@ void erase(EventState* es, Document* doc) {
             cur.x = global_coords.x + dx;
             cur.y = global_coords.y + dy;
 
-            Tile* t = get_tile(doc, tile_coords(cur), 0);
+            Tile* t = get_tile(document, tile_coords(cur), 0);
             if (t == NULL) {
                 continue;
             }
@@ -192,24 +198,24 @@ void pan(Document* document, EventState* event_state) {
 
 void render(
     SDL_Renderer* renderer,
-    EventState* es,
+    EventState* event_state,
     Document* document,
     uint32_t* framebuffer,
     SDL_Texture* texture
 ) {
     memset(framebuffer, 0xFFFFFFFF, SCREEN_WIDTH * SCREEN_HEIGHT * sizeof(uint32_t));
 
-    int32_t tile_start_x = floor_div(es->top_left_corner.x);
-    int32_t tile_end_x = floor_div(es->top_left_corner.x + CANVAS_WIDTH);
+    int32_t tile_start_x = floor_div(event_state->top_left_corner.x);
+    int32_t tile_end_x = floor_div(event_state->top_left_corner.x + CANVAS_WIDTH);
 
-    int32_t tile_start_y = floor_div(es->top_left_corner.y);
-    int32_t tile_end_y = floor_div(es->top_left_corner.y + CANVAS_HEIGHT);
+    int32_t tile_start_y = floor_div(event_state->top_left_corner.y);
+    int32_t tile_end_y = floor_div(event_state->top_left_corner.y + CANVAS_HEIGHT);
 
-    int32_t offset_x = es->top_left_corner.x % TILE_SIZE;
+    int32_t offset_x = event_state->top_left_corner.x % TILE_SIZE;
     if (offset_x < 0)
         offset_x += TILE_SIZE;
 
-    int32_t offset_y = es->top_left_corner.y % TILE_SIZE;
+    int32_t offset_y = event_state->top_left_corner.y % TILE_SIZE;
     if (offset_y < 0)
         offset_y += TILE_SIZE;
 
@@ -220,18 +226,20 @@ void render(
             Point tile_coords = {tx, ty};
             Tile* t = get_tile(document, tile_coords, IGNORE);
 
-            if (t == NULL) {
-                continue;
-            }
-
             for (int r = 0; r < TILE_SIZE; r++) {
                 int sy = (ty - tile_start_y) * TILE_SIZE + r - offset_y;
                 if (sy < 0 || sy >= CANVAS_HEIGHT)
                     continue;
 
+                framebuffer[sy * SCREEN_WIDTH + CANVAS_WIDTH] = 0xFF000000;
+                if (t == NULL) {
+                    continue;
+                }
+
                 for (int c = 0; c < TILE_SIZE; c++) {
+                    int sx = (tx - tile_start_x) * TILE_SIZE + c - offset_x;
+
                     if (t->map[r][c / 64] & MSB_SHIFT(c % 64)) {
-                        int sx = (tx - tile_start_x) * TILE_SIZE + c - offset_x;
                         if (sx < 0 || sx >= CANVAS_WIDTH)
                             continue;
 
@@ -242,12 +250,75 @@ void render(
         }
     }
 
+    for (int i = 0; i < SIDEBAR_WIDTH; i++) {
+        framebuffer[CANVAS_WIDTH + (CANVAS_HEIGHT / 4) * SCREEN_WIDTH + i] = 0xFF000000;
+        framebuffer[CANVAS_WIDTH + (CANVAS_HEIGHT / 2) * SCREEN_WIDTH + i] = 0xFF000000;
+        framebuffer[CANVAS_WIDTH + (3 * CANVAS_HEIGHT / 4) * SCREEN_WIDTH + i] = 0xFF000000;
+    }
+
+    for (int i = 0; i < SCREEN_WIDTH; i++) {
+        framebuffer[CANVAS_HEIGHT * SCREEN_WIDTH + i] = 0xFF000000;
+    }
+
+    FILE* pen_texture = fopen("./texture/pen.txr", "rb");
+    for (int i = 0; i < 64; i++) {
+        uint64_t row = 0;
+        fread(&row, sizeof(uint64_t), 1, pen_texture);
+
+        for (int j = 0; j < 64; j++) {
+            if (row & MSB_SHIFT(j)) {
+                framebuffer[i * SCREEN_WIDTH + CANVAS_WIDTH + j] = 0xFF000000;
+            }
+        }
+    }
+    fclose(pen_texture);
+
+    FILE* eraser_texture = fopen("./texture/eraser.txr", "rb");
+    for (int i = 0; i < 64; i++) {
+        uint64_t row = 0;
+        fread(&row, sizeof(uint64_t), 1, eraser_texture);
+
+        for (int j = 0; j < 64; j++) {
+            if (row & MSB_SHIFT(j)) {
+                framebuffer[(i + SCREEN_HEIGHT / 4) * SCREEN_WIDTH + CANVAS_WIDTH + j] = 0xFF000000;
+            }
+        }
+    }
+    fclose(eraser_texture);
+
+    FILE* pan_texture = fopen("./texture/pan.txr", "rb");
+    for (int i = 0; i < 64; i++) {
+        uint64_t row = 0;
+        fread(&row, sizeof(uint64_t), 1, pan_texture);
+
+        for (int j = 0; j < 64; j++) {
+            if (row & MSB_SHIFT(j)) {
+                framebuffer[(i + SCREEN_HEIGHT / 2) * SCREEN_WIDTH + CANVAS_WIDTH + j] = 0xFF000000;
+            }
+        }
+    }
+    fclose(pan_texture);
+
+    FILE* line_texture = fopen("./texture/line.txr", "rb");
+    for (int i = 0; i < 64; i++) {
+        uint64_t row = 0;
+        fread(&row, sizeof(uint64_t), 1, line_texture);
+
+        for (int j = 0; j < 64; j++) {
+            if (row & MSB_SHIFT(j)) {
+                framebuffer[(i + 3 * SCREEN_HEIGHT / 4) * SCREEN_WIDTH + CANVAS_WIDTH + j] =
+                    0xFF000000;
+            }
+        }
+    }
+    fclose(line_texture);
+
     SDL_UpdateTexture(texture, NULL, framebuffer, SCREEN_WIDTH * sizeof(uint32_t));
     SDL_RenderCopy(renderer, texture, NULL, NULL);
     SDL_RenderPresent(renderer);
 }
 
-int main() {
+int main(int argc, char** argv) {
     if (SDL_Init(SDL_INIT_VIDEO) < 0) {
         return -1;
     }
@@ -270,8 +341,7 @@ int main() {
     SDL_RenderPresent(renderer);
 
     EventState event_state = {0};
-    Document document = {0};
-    document.last_key = 0xFFFFFFFFFFFFFFFF;
+    Document document = new_document(argv[0]);
     load_file(&document, event_state.top_left_corner);
 
     uint32_t* framebuffer = calloc(SCREEN_WIDTH * SCREEN_HEIGHT, sizeof(uint32_t));

@@ -2,12 +2,21 @@
 #include <string.h>
 
 #include "../include/document.h"
+#include "../include/path.h"
 
 static uint64_t hash_point(uint64_t x) {
     x = (x ^ (x >> 30)) * 0xbf58476d1ce4e5b9;
     x = (x ^ (x >> 27)) * 0x94d049bb133111eb;
     x = x ^ (x >> 31);
     return x;
+}
+
+Document new_document(Path file_path) {
+    Document document = {0};
+    document.last_key = 0xFFFFFFFFFFFFFFFF;
+    strcpy(document.filepath, file_path);
+
+    return document;
 }
 
 Tile* get_tile(Document* doc, Point tile_coord, uint8_t flags) {
